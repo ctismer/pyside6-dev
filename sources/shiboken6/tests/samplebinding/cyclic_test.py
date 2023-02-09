@@ -14,7 +14,7 @@ init_paths()
 from sample import ObjectType
 from sample import ObjectView
 from sample import ObjectModel
-
+from shiboken6.Shiboken import dump, disassembleFrame
 
 
 class ObjTest(unittest.TestCase):

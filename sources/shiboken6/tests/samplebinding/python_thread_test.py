@@ -66,6 +66,7 @@ class Consumer(threading.Thread):
                 logging.debug('CONSUMER - empty bucket')
             time.sleep(0.01)
 
+
 class ProducerConsumer(unittest.TestCase):
     '''Basic test case for producer-consumer QThread'''
 
@@ -89,9 +90,6 @@ class ProducerConsumer(unittest.TestCase):
         cons.join()
 
         self.assertEqual(prod.production_list, cons.consumption_list)
-
-
-
 
 
 if __name__ == '__main__':
