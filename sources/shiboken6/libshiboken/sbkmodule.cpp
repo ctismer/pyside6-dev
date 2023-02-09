@@ -477,7 +477,9 @@ PyObject *create(const char * /* modName */, void *moduleData)
 
     Shiboken::init();
     auto *module = PyModule_Create(reinterpret_cast<PyModuleDef *>(moduleData));
-
+#ifdef Py_GIL_DISABLED
+    PyUnstable_Module_SetGIL(module, Py_MOD_GIL_NOT_USED);
+#endif
     // Setup of a dir function for "missing" classes.
     auto *moduleDirTemplate = PyCFunction_NewEx(module_methods, nullptr, nullptr);
     // Turn this function into a bound object, so we have access to the module.

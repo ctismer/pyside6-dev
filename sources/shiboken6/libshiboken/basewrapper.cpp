@@ -1921,12 +1921,18 @@ std::string info(SbkObject *self)
         s << "C++ address....... <<Deleted>>\n";
     }
 
+#if defined(Py_GIL_DISABLED)
+        auto ref_field = reinterpret_cast<PyObject *>(self)->ob_ref_local;
+#else
+        auto ref_field = reinterpret_cast<PyObject *>(self)->ob_refcnt;
+#endif
+
     s << "hasOwnership...... " << bool(self->d->hasOwnership) << "\n"
          "containsCppWrapper " << self->d->containsCppWrapper << "\n"
          "validCppObject.... " << self->d->validCppObject << "\n"
          "wasCreatedByPython " << self->d->cppObjectCreated << "\n"
          "value......        " << isValueType(self) << "\n"
-         "reference count... " << reinterpret_cast<PyObject *>(self)->ob_refcnt << '\n';
+         "reference count... " << ref_field << '\n';
 
     if (self->d->parentInfo && self->d->parentInfo->parent) {
         s << "parent............ ";

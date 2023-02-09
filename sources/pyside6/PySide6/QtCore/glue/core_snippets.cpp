@@ -277,12 +277,16 @@ PyObject *invokeMetaMethod(const InvokeMetaMethodFunc &f,
                            const QtCoreHelper::QGenericArgumentHolder &a8,
                            const QtCoreHelper::QGenericArgumentHolder &a9)
 {
+#ifndef Py_GIL_DISABLED
     PyThreadState *_save = PyEval_SaveThread(); // Py_BEGIN_ALLOW_THREADS
+#endif
     const bool resultB = f(a0.toGenericArgument(), a1.toGenericArgument(), a2.toGenericArgument(),
                            a3.toGenericArgument(), a4.toGenericArgument(), a5.toGenericArgument(),
                            a6.toGenericArgument(), a7.toGenericArgument(), a8.toGenericArgument(),
                            a9.toGenericArgument());
+#ifndef Py_GIL_DISABLED
     PyEval_RestoreThread(_save); // Py_END_ALLOW_THREADS
+#endif
     PyObject *result = resultB ? Py_True : Py_False;
     Py_INCREF(result);
     return result;

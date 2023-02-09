@@ -9,10 +9,12 @@ from argparse import ArgumentParser, RawTextHelpFormatter
 import sys
 
 from PySide6.QtCore import (Signal, QMutex, QElapsedTimer, QMutexLocker,
-                            QPoint, QPointF, QRectF, QSize, Qt, QThread,
+                            QPoint, QPointF, QSize, Qt, QThread,
                             QWaitCondition, Slot)
 from PySide6.QtGui import QColor, QImage, QPainter, QPixmap, qRgb
 from PySide6.QtWidgets import QApplication, QWidget
+
+import concurrent.futures
 
 
 DEFAULT_CENTER_X = -0.647011
@@ -26,6 +28,7 @@ SCROLL_STEP = 20
 
 NUM_PASSES = 8
 QUIT = False
+POOL_SIZE = 4
 
 
 INFO_KEY = 'info'
@@ -79,6 +82,47 @@ class RenderThread(QThread):
                 self.restart = True
                 self.condition.wakeOne()
 
+    def calculate_stripe(self, image, y, max_iterations, LIMIT):
+        scale_factor = self._scale_factor
+        # half_height = self._half_height
+        half_width = self._half_width
+        centerX = self._center_x
+        centerY = self._center_y
+
+        ay = 1j * (centerY + (y * scale_factor))
+
+        all_black = True
+        for x in range(-half_width, half_width):
+            c0 = centerX + (x * scale_factor) + ay
+            c = c0
+            num_iterations = 0
+
+            while num_iterations < max_iterations:
+                num_iterations += 1
+                c = c * c + c0
+                if abs(c) >= LIMIT:
+                    break
+                num_iterations += 1
+                c = c * c + c0
+                if abs(c) >= LIMIT:
+                    break
+                num_iterations += 1
+                c = c * c + c0
+                if abs(c) >= LIMIT:
+                    break
+                num_iterations += 1
+                c = c * c + c0
+                if abs(c) >= LIMIT:
+                    break
+
+            if num_iterations < max_iterations:
+                image.setPixel(x + half_width, 0,
+                               self.colormap[num_iterations % RenderThread.colormap_size])
+                all_black = False
+            else:
+                image.setPixel(x + half_width, 0, qRgb(0, 0, 0))
+        return all_black, image
+
     def run(self):
         timer = QElapsedTimer()
 
@@ -86,8 +130,8 @@ class RenderThread(QThread):
             self.mutex.lock()
             resultSize = self._result_size
             scale_factor = self._scale_factor
-            centerX = self._center_x
-            centerY = self._center_y
+            # centerX = self._center_x
+            # centerY = self._center_y
             self.mutex.unlock()
 
             half_width = resultSize.width() // 2
@@ -96,50 +140,42 @@ class RenderThread(QThread):
 
             curpass = 0
 
+            self._half_width = half_width
+            self._half_height = half_height
+
             while curpass < NUM_PASSES:
                 timer.restart()
                 max_iterations = (1 << (2 * curpass + 6)) + 32
                 LIMIT = 4
                 all_black = True
 
-                for y in range(-half_height, half_height):
-                    if self.restart:
-                        break
-                    if self.abort:
-                        return
+                with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
 
-                    ay = 1j * (centerY + (y * scale_factor))
+                    future_to_y = {}
 
-                    for x in range(-half_width, half_width):
-                        c0 = centerX + (x * scale_factor) + ay
-                        c = c0
-                        num_iterations = 0
+                    for y in range(-half_height, half_height):
+                        if self.restart:
+                            break
+                        if self.abort:
+                            return
 
-                        while num_iterations < max_iterations:
-                            num_iterations += 1
-                            c = c * c + c0
-                            if abs(c) >= LIMIT:
-                                break
-                            num_iterations += 1
-                            c = c * c + c0
-                            if abs(c) >= LIMIT:
-                                break
-                            num_iterations += 1
-                            c = c * c + c0
-                            if abs(c) >= LIMIT:
-                                break
-                            num_iterations += 1
-                            c = c * c + c0
-                            if abs(c) >= LIMIT:
-                                break
+                        # The idea to decouple multiple calculations:
+                        # * Build individual 1-bit stripes.
+                        # * Have a single collector that runs when all stripes are ready.
+                        stripe = QImage(QSize(resultSize.width(), 1), QImage.Format_RGB32)
+                        future_to_y[executor.submit(self.calculate_stripe, stripe, y,
+                                                    max_iterations, LIMIT)] = y
 
-                        if num_iterations < max_iterations:
-                            image.setPixel(x + half_width, y + half_height,
-                                           self.colormap[
-                                               num_iterations % RenderThread.colormap_size])
-                            all_black = False
-                        else:
-                            image.setPixel(x + half_width, y + half_height, qRgb(0, 0, 0))
+                    for future in concurrent.futures.as_completed(future_to_y):
+                        y = future_to_y[future]
+                        try:
+                            data = future.result()
+                        except Exception as exc:
+                            print('%r generated an exception: %s' % (y, exc))
+                        black, stripe = data
+                        all_black &= black
+                        for x in range(resultSize.width()):
+                            image.setPixel(x, y + half_height, stripe.pixel(x, 0))
 
                 if all_black and curpass == 0:
                     curpass = 4
@@ -154,6 +190,7 @@ class RenderThread(QThread):
                                 f"max iterations: {max_iterations}, time: {elapsed}{unit}")
                         image.setText(INFO_KEY, text)
                         self.rendered_image.emit(image, scale_factor)
+                        print(text)
                     curpass += 1
 
             self.mutex.lock()
@@ -222,11 +259,11 @@ class MandelbrotWidget(QWidget):
 
     def paintEvent(self, event):
         with QPainter(self) as painter:
-            painter.fillRect(self.rect(), Qt.GlobalColor.black)
+            painter.fillRect(self.rect(), Qt.black)
 
             if self.pixmap.isNull():
-                painter.setPen(Qt.GlobalColor.white)
-                painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter,
+                painter.setPen(Qt.white)
+                painter.drawText(self.rect(), Qt.AlignCenter,
                                  "Rendering initial image, please wait...")
                 return
 
@@ -253,33 +290,31 @@ class MandelbrotWidget(QWidget):
             metrics = painter.fontMetrics()
             text_width = metrics.horizontalAdvance(text)
 
-            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setPen(Qt.NoPen)
             painter.setBrush(QColor(0, 0, 0, 127))
-            box = QRectF((self.width() - text_width) / 2 - 5, 0,
-                         text_width + 10, metrics.lineSpacing() + 5)
-            painter.drawRect(box)
-            painter.setPen(Qt.GlobalColor.white)
-            pos = QPointF((self.width() - text_width) / 2,
-                          metrics.leading() + metrics.ascent())
-            painter.drawText(pos, text)
+            painter.drawRect((self.width() - text_width) / 2 - 5, 0, text_width + 10,
+                             metrics.lineSpacing() + 5)
+            painter.setPen(Qt.white)
+            painter.drawText((self.width() - text_width) / 2,
+                             metrics.leading() + metrics.ascent(), text)
 
     def resizeEvent(self, event):
         self.thread.render(self._center_x, self._center_y, self._cur_scale, self.size())
 
     def keyPressEvent(self, event):
-        if event.key() == Qt.Key.Key_Plus:
+        if event.key() == Qt.Key_Plus:
             self.zoom(ZOOM_IN_FACTOR)
-        elif event.key() == Qt.Key.Key_Minus:
+        elif event.key() == Qt.Key_Minus:
             self.zoom(ZOOM_OUT_FACTOR)
-        elif event.key() == Qt.Key.Key_Left:
+        elif event.key() == Qt.Key_Left:
             self.scroll(-SCROLL_STEP, 0)
-        elif event.key() == Qt.Key.Key_Right:
+        elif event.key() == Qt.Key_Right:
             self.scroll(+SCROLL_STEP, 0)
-        elif event.key() == Qt.Key.Key_Down:
+        elif event.key() == Qt.Key_Down:
             self.scroll(0, -SCROLL_STEP)
-        elif event.key() == Qt.Key.Key_Up:
+        elif event.key() == Qt.Key_Up:
             self.scroll(0, +SCROLL_STEP)
-        elif event.key() == Qt.Key.Key_Q:
+        elif event.key() == Qt.Key_Q:
             self.close()
         else:
             super(MandelbrotWidget, self).keyPressEvent(event)
@@ -290,18 +325,18 @@ class MandelbrotWidget(QWidget):
         self.zoom(pow(ZOOM_IN_FACTOR, num_steps))
 
     def mousePressEvent(self, event):
-        if event.buttons() == Qt.MouseButton.LeftButton:
+        if event.buttons() == Qt.LeftButton:
             self._last_drag_pos = event.position()
 
     def mouseMoveEvent(self, event):
-        if event.buttons() & Qt.MouseButton.LeftButton:
+        if event.buttons() & Qt.LeftButton:
             pos = event.position()
             self._pixmap_offset += pos - self._last_drag_pos
             self._last_drag_pos = pos
             self.update()
 
     def mouseReleaseEvent(self, event):
-        if event.button() == Qt.MouseButton.LeftButton:
+        if event.button() == Qt.LeftButton:
             pos = event.position()
             self._pixmap_offset += pos - self._last_drag_pos
             self._last_drag_pos = QPointF()
@@ -338,6 +373,7 @@ if __name__ == '__main__':
     parser = ArgumentParser(description='Qt Mandelbrot Example',
                             formatter_class=RawTextHelpFormatter)
     parser.add_argument('--passes', '-p', type=int, help='Number of passes (1-8)')
+    parser.add_argument('--poolsize', '-s', type=int, help='Size of thread pool')
     parser.add_argument('--quit', '-q', action="store_true", help='Quit after passes')
     options = parser.parse_args()
     if options.passes:
@@ -345,6 +381,8 @@ if __name__ == '__main__':
         if NUM_PASSES < 1 or NUM_PASSES > 8:
             print(f'Invalid value: {options.passes}')
             sys.exit(-1)
+    if options.poolsize:
+        POOL_SIZE = int(options.poolsize)
     if options.quit:
         QUIT = True
 

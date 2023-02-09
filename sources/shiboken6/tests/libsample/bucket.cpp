@@ -16,8 +16,14 @@
 #  define SLEEP(x) usleep(x)
 #endif
 
+// PYSIDE-2221: This is only a demo from Sam Gross.
+//              We need to automate such locking in the code generator.
+// The patch stays here as a comment until automated.
 void Bucket::push(int x)
 {
+#ifdef Py_GIL_DISABLED
+    std::unique_lock<std::mutex> lock(m_mutex);
+#endif
     m_data.push_back(x);
 }
 
@@ -25,6 +31,9 @@ int Bucket::pop(void)
 {
     int x = 0;
 
+#ifdef Py_GIL_DISABLED
+    std::unique_lock<std::mutex> lock(m_mutex);
+#endif
     if (!m_data.empty()) {
         x = m_data.front();
         m_data.pop_front();
@@ -35,6 +44,9 @@ int Bucket::pop(void)
 
 bool Bucket::empty()
 {
+#ifdef Py_GIL_DISABLED
+    std::unique_lock<std::mutex> lock(m_mutex);
+#endif
     return m_data.empty();
 }
 

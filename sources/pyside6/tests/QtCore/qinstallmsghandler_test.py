@@ -47,6 +47,9 @@ class QInstallMsgHandlerTest(unittest.TestCase):
         self.assertEqual(ret, None)
         refcount = sys.getrefcount(handleruseless)
         retNone = qInstallMessageHandler(handleruseless)  # noqa: F841
+        if hasattr(sys, "sys._is_gil_enabled()") and not sys._is_gil_enabled:
+            # PYSIDE-2221: This is an immortal object
+            refcount -= 1
         self.assertEqual(sys.getrefcount(handleruseless), refcount + 1)
         rethandler = qInstallMessageHandler(None)
         self.assertEqual(rethandler, handleruseless)

@@ -22,9 +22,13 @@ constexpr auto PYTHON_TO_CPP_VAR = QLatin1StringView("pythonToCpp");
 
 constexpr auto CONV_RULE_OUT_VAR_SUFFIX = QLatin1StringView("_out");
 constexpr auto BEGIN_ALLOW_THREADS
-    = QLatin1StringView("PyThreadState *_save = PyEval_SaveThread(); // Py_BEGIN_ALLOW_THREADS");
+    = QLatin1StringView("#ifndef Py_GIL_DISABLED\n"
+                        "PyThreadState *_save = PyEval_SaveThread(); // Py_BEGIN_ALLOW_THREADS\n"
+                        "#endif");
 constexpr auto END_ALLOW_THREADS
-    = QLatin1StringView("PyEval_RestoreThread(_save); // Py_END_ALLOW_THREADS");
+    = QLatin1StringView("#ifndef Py_GIL_DISABLED\n"
+                        "PyEval_RestoreThread(_save); // Py_END_ALLOW_THREADS\n"
+                        "#endif");
 
 constexpr auto REPR_FUNCTION = QLatin1StringView("__repr__");
 

@@ -97,6 +97,8 @@ signature/signature.cpp signature.h signature_p.h
 signature/signature_globals.cpp
 signature/signature_extend.cpp
 signature/signature_helper.cpp
+
+wrappermutex.cpp
 )
 
 # This is needed to let the header obey a variable in "pep384impl.h".
@@ -191,6 +193,8 @@ install(FILES
 
         signature.h
         signature_p.h
+
+        wrappermutex.h
 
         DESTINATION include/shiboken6${shiboken6_SUFFIX})
 install(TARGETS libshiboken EXPORT Shiboken6Targets

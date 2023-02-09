@@ -8,6 +8,7 @@
 #include "objecttype.h"
 
 #include <list>
+#include <mutex>
 
 class ObjectType;
 
@@ -27,6 +28,7 @@ public:
 
 private:
     std::list<int> m_data;
+    std::mutex m_mutex;
 
     volatile bool m_locked = false;
 };

@@ -16,6 +16,12 @@ init_paths()
 
 from sample import PointerHolder
 
+# From test_builtins.py
+if sys.maxsize < (1 << 32):
+    IMMORTAL_REFCOUNT = (1 << 30) - 1
+else:
+    IMMORTAL_REFCOUNT = (1 << 32) - 1
+
 
 class TestPointerHolder(unittest.TestCase):
     '''Test cases for a class that holds an arbitraty pointer and
@@ -35,7 +41,7 @@ class TestPointerHolder(unittest.TestCase):
         refcnt = sys.getrefcount(a)
         ph = PointerHolder(a)
         ptr = ph.pointer()  # noqa: F841
-        self.assertEqual(sys.getrefcount(a), refcnt + 1)
+        self.assertEqual(sys.getrefcount(a), refcnt + 1 if refcnt != IMMORTAL_REFCOUNT else refcnt)
 
 
 if __name__ == '__main__':
