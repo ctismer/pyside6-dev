@@ -18,6 +18,7 @@
 
 void Bucket::push(int x)
 {
+    std::unique_lock<std::mutex> lock(m_mutex);
     m_data.push_back(x);
 }
 
@@ -25,6 +26,7 @@ int Bucket::pop(void)
 {
     int x = 0;
 
+    std::unique_lock<std::mutex> lock(m_mutex);
     if (m_data.size() > 0) {
         x = m_data.front();
         m_data.pop_front();
@@ -35,9 +37,9 @@ int Bucket::pop(void)
 
 bool Bucket::empty()
 {
+    std::unique_lock<std::mutex> lock(m_mutex);
     return m_data.empty();
 }
-
 void Bucket::lock()
 {
     m_locked = true;
