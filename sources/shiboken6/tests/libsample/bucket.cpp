@@ -18,6 +18,9 @@
 
 void Bucket::push(int x)
 {
+#ifdef Py_NOGIL
+    std::unique_lock<std::mutex> lock(m_mutex);
+#endif
     m_data.push_back(x);
 }
 
@@ -25,6 +28,9 @@ int Bucket::pop(void)
 {
     int x = 0;
 
+#ifdef Py_NOGIL
+    std::unique_lock<std::mutex> lock(m_mutex);
+#endif
     if (m_data.size() > 0) {
         x = m_data.front();
         m_data.pop_front();
@@ -35,6 +41,9 @@ int Bucket::pop(void)
 
 bool Bucket::empty()
 {
+#ifdef Py_NOGIL
+    std::unique_lock<std::mutex> lock(m_mutex);
+#endif
     return m_data.empty();
 }
 
