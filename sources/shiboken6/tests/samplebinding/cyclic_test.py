@@ -87,7 +87,7 @@ class ObjTest(unittest.TestCase):
 
 if __name__ == '__main__':
     # PYSIDE-2221: Temporary hack for debugging
-    for idx in range(99999):
+    for idx in range(10):
         #disassembleFrame(42)
         ObjTest().test_cyclic_dependency_withParent()
         #ObjTest().test_cyclic_dependency_withKeepRef()

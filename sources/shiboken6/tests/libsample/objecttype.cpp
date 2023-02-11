@@ -16,8 +16,14 @@ ObjectType::ObjectType(ObjectType *parent)
 
 ObjectType::~ObjectType()
 {
-    for (auto *o : m_children)
+    if (m_parent) {
+        m_parent->removeChild(this);
+    }
+    ObjectTypeList children;
+    children.swap(m_children);
+    for (auto *o : children) {
         delete o;
+    }
 }
 
 ObjectType *ObjectType::createWithChild()
