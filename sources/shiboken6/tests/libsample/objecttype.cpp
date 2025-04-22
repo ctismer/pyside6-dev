@@ -9,6 +9,25 @@
 #include <string>
 #include <assert.h>
 
+#include "objecttype.h"
+#include <unordered_set>
+#include <mutex>
+
+static std::mutex s_registry_mutex;
+std::unordered_set<ObjectType*> ObjectType::s_pythonOwned;
+
+void ObjectType::markPythonOwned(ObjectType* obj)
+{
+    std::lock_guard<std::mutex> lock(s_registry_mutex);
+    s_pythonOwned.insert(obj);
+}
+
+bool ObjectType::isPythonOwned(ObjectType* obj)
+{
+    std::lock_guard<std::mutex> lock(s_registry_mutex);
+    return s_pythonOwned.count(obj) != 0;
+}
+
 ObjectType::ObjectType(ObjectType *parent)
 {
     setParent(parent);
@@ -19,8 +38,20 @@ ObjectType &ObjectType::operator=(ObjectType &&) noexcept = default;
 
 ObjectType::~ObjectType()
 {
-    for (auto *o : m_children)
-        delete o;
+    fprintf(stderr, "🧨 ~ObjectType() entered: this = %p\n", this);
+
+    size_t index = 0;
+    for (auto* o : m_children) {
+        if (ObjectType::isPythonOwned(o)) {
+            fprintf(stderr, "🧷 Skipping delete for Python-owned child %zu: %p\n", index, static_cast<void*>(o));
+        } else {
+            fprintf(stderr, "🧹 Deleting child %zu: %p\n", index, static_cast<void*>(o));
+            delete o;
+        }
+        ++index;
+    }
+
+    fprintf(stderr, "✅ ~ObjectType() done\n");
 }
 
 ObjectType *ObjectType::createWithChild()

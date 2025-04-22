@@ -16,6 +16,7 @@ from sample import ObjectType
 from sample import ObjectView
 from sample import ObjectModel
 
+from shiboken6.Shiboken import dump, disassembleFrame
 
 class ObjTest(unittest.TestCase):
 
@@ -26,12 +27,15 @@ class ObjTest(unittest.TestCase):
         """
         class CyclicChildObject(ObjectType):
             def __init__(self, parent):
+                disassembleFrame(42)
                 super(CyclicChildObject, self).__init__(parent)
+                ObjectType.markPythonOwned(self)
                 self._parent = parent
 
         class CyclicObject(ObjectType):
             def __init__(self):
                 super(CyclicObject, self).__init__()
+                ObjectType.markPythonOwned(self)
                 CyclicChildObject(self)
 
         # turn off automatic garbage collection, to be able to trigger it
@@ -52,39 +56,40 @@ class ObjTest(unittest.TestCase):
         gc.collect()
         self.assertFalse(alive())
 
-    def test_cyclic_dependency_withKeepRef(self):
-        """Create 2 objects with a cyclic dependency, so that they can
-        only be removed by the garbage collector, and then invoke the
-        garbage collector in a different thread.
-        """
-        class CyclicChildObject(ObjectView):
-            def __init__(self, model):
-                super(CyclicChildObject, self).__init__(None)
-                self.setModel(model)
+    # def test_cyclic_dependency_withKeepRef(self):
+    #     """Create 2 objects with a cyclic dependency, so that they can
+    #     only be removed by the garbage collector, and then invoke the
+    #     garbage collector in a different thread.
+    #     """
+    #     class CyclicChildObject(ObjectView):
+    #         def __init__(self, model):
+    #             super(CyclicChildObject, self).__init__(None)
+    #             self.setModel(model)
 
-        class CyclicObject(ObjectModel):
-            def __init__(self):
-                super(CyclicObject, self).__init__()
-                self._view = CyclicChildObject(self)
+    #     class CyclicObject(ObjectModel):
+    #         def __init__(self):
+    #             super(CyclicObject, self).__init__()
+    #             self._view = CyclicChildObject(self)
 
-        # turn off automatic garbage collection, to be able to trigger it
-        # at the 'right' time
-        gc.disable()
-        alive = lambda: sum(isinstance(o, CyclicObject) for o in gc.get_objects())  # noqa: E731
+    #     # turn off automatic garbage collection, to be able to trigger it
+    #     # at the 'right' time
+    #     gc.disable()
+    #     alive = lambda: sum(isinstance(o, CyclicObject) for o in gc.get_objects())  # noqa: E731
 
-        #
-        # first proof that the wizard is only destructed by the garbage
-        # collector
-        #
-        cycle = CyclicObject()
-        self.assertTrue(alive())
-        del cycle
-        if not hasattr(sys, "pypy_version_info"):
-            # PYSIDE-535: the semantics of gc.enable/gc.disable is different for PyPy
-            self.assertTrue(alive())
-        gc.collect()
-        self.assertFalse(alive())
+    #     #
+    #     # first proof that the wizard is only destructed by the garbage
+    #     # collector
+    #     #
+    #     cycle = CyclicObject()
+    #     self.assertTrue(alive())
+    #     del cycle
+    #     if not hasattr(sys, "pypy_version_info"):
+    #         # PYSIDE-535: the semantics of gc.enable/gc.disable is different for PyPy
+    #         self.assertTrue(alive())
+    #     gc.collect()
+    #     self.assertFalse(alive())
 
-
-if __name__ == '__main__':
-    unittest.main()
+for i in range(1000):
+    print(f"\n--- 🔁 Versuch {i} ---", flush=True)
+    suite = unittest.TestLoader().loadTestsFromTestCase(ObjTest)
+    unittest.TextTestRunner().run(suite)

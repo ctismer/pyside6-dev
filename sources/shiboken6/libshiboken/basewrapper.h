@@ -12,6 +12,14 @@
 #include <vector>
 #include <string>
 
+#pragma once
+#include <mutex>
+#include "sbkpython.h"
+
+namespace Shiboken {
+    extern LIBSHIBOKEN_API std::recursive_mutex gil_replacement;
+}
+
 extern "C"
 {
 

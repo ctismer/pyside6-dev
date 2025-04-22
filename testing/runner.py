@@ -136,7 +136,7 @@ class TestRunner:
         but was a little faster.
         """
 
-        self.cmd = cmd_tuple
+        self.cmd = list(cmd_tuple) + ["-VV"]
         # We no longer use the shell option. It introduces wrong handling
         # of certain characters which are not yet correctly escaped:
         # Especially the "^" caret char is treated as an escape, and pipe symbols

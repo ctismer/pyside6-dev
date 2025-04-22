@@ -36,6 +36,12 @@ namespace {
     void _destroyParentInfo(SbkObject *obj, bool keepReference);
 }
 
+#include "basewrapper.h"
+
+namespace Shiboken {
+    std::recursive_mutex gil_replacement;
+}
+
 namespace Shiboken
 {
 // Walk through the first level of non-user-type Sbk base classes relevant for
@@ -463,6 +469,12 @@ static inline PyObject *_Sbk_NewVarObject(PyTypeObject *type)
 
 void SbkDeallocWrapper(PyObject *pyObj)
 {
+   fprintf(stderr, "🧨 [SbkDeallocWrapper] Dealloc for %p\n", pyObj);
+
+    std::lock_guard<std::recursive_mutex> guard(Shiboken::gil_replacement);
+    fprintf(stderr, "🔒 [SbkDeallocWrapper] gil_replacement lock acquired\n");
+
+    // The original logic
     SbkDeallocWrapperCommon(pyObj, true);
 }
 

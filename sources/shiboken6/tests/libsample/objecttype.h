@@ -11,6 +11,9 @@
 
 #include <list>
 
+// objecttype.h
+#include <unordered_set>
+
 struct Event
 {
     enum EventType {
@@ -130,6 +133,9 @@ public:
     // may be returned by the QWidget's implementation but isn't always returned
     ObjectType *nextInFocusChain() { return m_parent; }
 
+    static void markPythonOwned(ObjectType* obj);
+    static bool isPythonOwned(ObjectType* obj);
+
 private:
     ObjectTypeLayout *takeLayout();
     ObjectTypeList::iterator findChildByName(const Str &name);
@@ -141,6 +147,8 @@ private:
     ObjectTypeLayout *m_layout = nullptr;
     //used on overload null test
     int m_call_id = -1;
+
+    static std::unordered_set<ObjectType*> s_pythonOwned;
 };
 
 LIBSAMPLE_API unsigned int objectTypeHash(const ObjectType *objectType);
